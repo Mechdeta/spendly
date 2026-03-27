@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Spendly{% endblock %}
+
+{% block content %}
+<section class="dashboard-section">
+    <div class="dashboard-inner">
+        <div class="dashboard-header">
+            <div>
+                <h1 class="dashboard-title">Hello, {{ session.get('user_name', 'there') }}</h1>
+                <p class="dashboard-subtitle">Track every expense and keep your spending in check.</p>
+            </div>
+            <div class="dashboard-total-card">
+                <span class="total-label">Visible Total</span>
+                <span class="total-value">Rs {{ '%.2f'|format(total_spent) }}</span>
+            </div>
+        </div>
+
+        <div class="panel month-panel">
+            <form method="GET" action="{{ url_for('profile') }}" class="month-selector-form">
+                <div class="form-group month-group">
+                    <label for="month">Analytics month</label>
+                    <select id="month" name="month" class="form-input" onchange="this.form.submit()">
+                        {% for month_value in month_options %}
+                        <option value="{{ month_value }}" {% if month_value == selected_month %}selected{% endif %}>{{ month_value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if selected_category %}
+                <input type="hidden" name="category" value="{{ selected_category }}">
+                {% endif %}
+                {% if date_from %}
+                <input type="hidden" name="from" value="{{ date_from }}">
+                {% endif %}
+                {% if date_to %}
+                <input type="hidden" name="to" value="{{ date_to }}">
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="analytics-grid">
+            <article class="analytics-card">
+                <span class="analytics-label">Month Spend</span>
+                <strong class="analytics-value">Rs {{ '%.2f'|format(monthly_total) }}</strong>
+                <small class="analytics-note">For {{ selected_month }}</small>
+            </article>
+            <article class="analytics-card">
+                <span class="analytics-label">Transactions</span>
+                <strong class="analytics-value">{{ monthly_count }}</strong>
+                <small class="analytics-note">Entries this month</small>
+            </article>
+            <article class="analytics-card">
+                <span class="analytics-label">Avg Transaction</span>
+                <strong class="analytics-value">Rs {{ '%.2f'|format(monthly_avg) }}</strong>
+                <small class="analytics-note">Mean spend per entry</small>
+            </article>
+            <article class="analytics-card">
+                <span class="analytics-label">Top Category</span>
+                <strong class="analytics-value">{{ top_category }}</strong>
+                <small class="analytics-note">Highest spend area</small>
+            </article>
+        </div>
+
+        <div class="dashboard-grid analytics-panels-grid">
+            <div class="panel">
+                <h2 class="panel-title">Category Breakdown</h2>
+                {% if category_breakdown %}
+                <div class="breakdown-list">
+                    {% for item in category_breakdown %}
+                    <div class="breakdown-item">
+                        <div class="breakdown-head">
+                            <span>{{ item.category_name }}</span>
+                            <span>Rs {{ '%.2f'|format(item.spent) }} ({{ '%.1f'|format(item.share) }}%)</span>
+                        </div>
+                        <progress class="meter" max="100" value="{{ '%.2f'|format(item.share) }}"></progress>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-state">No spending data for {{ selected_month }} yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title">Set Category Budget</h2>
+                <form method="POST" action="{{ url_for('set_budget') }}" class="inline-form">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <div class="form-group">
+                        <label for="budget_category_id">Category</label>
+                        <select id="budget_category_id" name="category_id" class="form-input" required>
+                            <option value="">Select category</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="budget_amount">Budget amount</label>
+                        <input type="number" id="budget_amount" name="amount" step="0.01" min="0.01" class="form-input" placeholder="0.00" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Save Budget</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel budget-panel">
+            <div class="panel-head-row">
+                <h2 class="panel-title">Budget Progress ({{ selected_month }})</h2>
+                <span class="muted-count">Rs {{ '%.2f'|format(budget_summary.spent) }} of Rs {{ '%.2f'|format(budget_summary.budgeted) }}</span>
+            </div>
+            {% if budget_progress %}
+            <div class="budget-list">
+                {% for item in budget_progress %}
+                <div class="budget-item {% if item.is_over %}budget-over{% endif %}">
+                    <div class="budget-head">
+                        <strong>{{ item.category_name }}</strong>
+                        <span>Rs {{ '%.2f'|format(item.spent_amount) }} / Rs {{ '%.2f'|format(item.budget_amount) }}</span>
+                    </div>
+                    <progress class="meter {% if item.is_over %}meter-danger{% endif %}" max="100" value="{{ '%.2f'|format(item.percent_used) }}"></progress>
+                    <p class="budget-note">
+                        {% if item.is_over %}
+                        Over budget by Rs {{ '%.2f'|format(item.spent_amount - item.budget_amount) }}
+                        {% else %}
+                        Remaining Rs {{ '%.2f'|format(item.remaining) }}
+                        {% endif %}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-state">No budgets set for {{ selected_month }}. Add one above to start tracking.</p>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="panel">
+                <h2 class="panel-title">Add Expense</h2>
+                <form method="POST" action="{{ url_for('add_expense') }}" class="inline-form">
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <input type="text" id="description" name="description" class="form-input" placeholder="Lunch, cab, internet bill">
+                    </div>
+                    <div class="two-col">
+                        <div class="form-group">
+                            <label for="amount">Amount</label>
+                            <input type="number" step="0.01" min="0.01" id="amount" name="amount" class="form-input" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="expense_date">Date</label>
+                            <input type="date" id="expense_date" name="expense_date" class="form-input" value="{{ today }}" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="category_id">Category</label>
+                        <select id="category_id" name="category_id" class="form-input" required>
+                            <option value="">Select category</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-submit">Save Expense</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title">Filters</h2>
+                <form method="GET" action="{{ url_for('profile') }}" class="inline-form">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <select id="category" name="category" class="form-input">
+                            <option value="">All categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="two-col">
+                        <div class="form-group">
+                            <label for="from">From</label>
+                            <input type="date" id="from" name="from" class="form-input" value="{{ date_from }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="to">To</label>
+                            <input type="date" id="to" name="to" class="form-input" value="{{ date_to }}">
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-submit">Apply Filters</button>
+                        <a href="{{ url_for('profile') }}" class="btn-ghost">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel expenses-panel">
+            <div class="panel-head-row">
+                <h2 class="panel-title">Expenses</h2>
+                <span class="muted-count">{{ expenses|length }} items</span>
+            </div>
+
+            {% if expenses %}
+            <div class="table-wrap">
+                <table class="expenses-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses %}
+                        <tr>
+                            <td>{{ expense.expense_date }}</td>
+                            <td>{{ expense.description or '-' }}</td>
+                            <td>{{ expense.category_name or 'Uncategorized' }}</td>
+                            <td class="amount-cell">Rs {{ '%.2f'|format(expense.amount) }}</td>
+                            <td class="actions-cell">
+                                <a href="{{ url_for('edit_expense', id=expense.id) }}" class="mini-btn">Edit</a>
+                                <form method="POST" action="{{ url_for('delete_expense', id=expense.id) }}" onsubmit="return confirm('Delete this expense?');">
+                                    <button type="submit" class="mini-btn danger-btn">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty-state">No expenses found. Add your first entry from the form above.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

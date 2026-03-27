@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Spendly{% endblock %}</title>
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem("spendly-theme");
+            const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            const theme = savedTheme || (systemPrefersDark ? "dark" : "light");
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -14,18 +22,38 @@
 
     <nav class="navbar">
         <div class="nav-inner">
-            <a href="{{ url_for('landing') }}" class="nav-brand">
+            <a href="{{ url_for('profile') if session.get('user_id') else url_for('landing') }}" class="nav-brand">
                 <span class="brand-icon">◈</span>
                 <span class="brand-name">Spendly</span>
             </a>
             <div class="nav-links">
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
+                    <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+                    <span class="theme-toggle-label">Night</span>
+                </button>
+                {% if session.get('user_id') %}
+                <a href="{{ url_for('profile') }}">Dashboard</a>
+                <a href="{{ url_for('logout') }}" class="nav-cta">Sign out</a>
+                {% else %}
                 <a href="{{ url_for('login') }}">Sign in</a>
                 <a href="{{ url_for('register') }}" class="nav-cta">Get started</a>
+                {% endif %}
             </div>
         </div>
     </nav>
 
     <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="flash-wrap">
+            <div class="flash-inner">
+                {% for category, message in messages %}
+                <div class="flash-item flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </main>
 
